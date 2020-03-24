@@ -1,0 +1,74 @@
+```{r}
+defaultdir <- getwd()
+dir.create("graphs")
+# "/graphs/"
+# setwd(paste(defaultdir,"/graphs/", sep = ""))
+dir.create("tables")
+# setwd(paste(defaultdir,"/tables/", sep = ""))
+
+
+```
+
+```{r, loading packages, include=TRUE, echo=FALSE}
+#Adding the required packages for this file. Don't change the current order, and add new packages to the first.
+packages <- c(
+  "ggplot2", 
+  "tidyverse", 
+  "dplyr",
+  "corrplot",
+  "Hmisc"
+  ) 
+if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
+  install.packages(setdiff(packages, rownames(installed.packages())))
+  lapply(packages, library, character.only = TRUE)
+} else {
+  lapply(packages, library, character.only = TRUE)
+}
+#Adding the required packages for this file. Don't change the current order, and add new packages to the first.
+
+```
+
+```{r}
+setwd(paste(defaultdir,"/tables/", sep = ""))
+dir.create("Combined_Hydro")
+# setwd(paste(defaultdir,"/tables/Combined_Hydro/", sep = ""))
+
+
+
+## Combine Hydro and Coordinates together
+setwd(defaultdir)
+
+for (i in 2006:2019){
+  Hydro = read.csv(paste(defaultdir,"/data/Hydro/",i,".csv",sep=""),
+                     header = TRUE,sep = ",")
+  Hydro_Coordinates = read.csv(paste(defaultdir,"/data/Hydro/",i, "_Coordinates.csv",sep=""),
+                          header = TRUE,sep = ",")
+  names(Hydro)[1] <- "Site_id"
+  names(Hydro_Coordinates)[1] <- "Site_id"
+  a <- inner_join(Hydro_Coordinates, Hydro, by = "Site_id")
+  
+  a <- a[,c(-27, -4)]
+  write.csv(a, paste(defaultdir,"/tables/Combined_Hydro/",i ,"_Combined_Hydro.csv",sep=""), row.names = FALSE)
+}
+remove(a, b, i, j, Hydro, Hydro_Coordinates)
+## Combine Hydro and Coordinates together
+
+## Add all years' observation together
+setwd(paste(defaultdir,"/tables/Combined_Hydro/", sep = ""))
+a <- read.csv("2006_Combined_Hydro.csv", header = TRUE,sep = ",")
+for(i in 2006:2018){
+  a <- rbind(a, read.csv(paste(i+1, "_Combined_Hydro.csv", sep = ""), header = TRUE,sep = ","))
+}
+write.csv(a, paste(defaultdir,"/tables/Combined_Hydro/","Total" ,"_Combined_Hydro.csv",sep=""), row.names = FALSE)
+remove(a, b, i)
+## Add all years' observation together
+
+
+
+
+
+
+```
+
+
+

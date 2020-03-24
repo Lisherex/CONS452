@@ -1,0 +1,63 @@
+```{r}
+defaultdir <- getwd()
+dir.create("graphs")
+# "/graphs/"
+# setwd(paste(defaultdir,"/graphs/", sep = ""))
+dir.create("tables")
+# setwd(paste(defaultdir,"/tables/", sep = ""))
+
+
+```
+
+```{r, loading packages, include=TRUE, echo=FALSE}
+#Adding the required packages for this file. Don't change the current order, and add new packages to the first.
+packages <- c(
+  "ggplot2", 
+  "tidyverse", 
+  "dplyr",
+  "corrplot",
+  "Hmisc",
+  "stringr"
+  ) 
+if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
+  install.packages(setdiff(packages, rownames(installed.packages())))
+  lapply(packages, library, character.only = TRUE)
+} else {
+  lapply(packages, library, character.only = TRUE)
+}
+#Adding the required packages for this file. Don't change the current order, and add new packages to the first.
+
+```
+
+```{r}
+setwd(paste(defaultdir,"/tables/", sep = ""))
+dir.create("Combined_VVI_MarshClass_HydroFiltered")
+setwd(defaultdir)
+
+for (i in 2006:2019){
+  Combined_Hydro_filtered <- read.csv(paste(defaultdir,"/tables/Combined_Hydro_filtered/",i,"_Combined_Hydro_filtered.csv", 
+                                            sep=""), header = TRUE,sep = ",")
+  Combined_Hydro_filtered <- Combined_Hydro_filtered[, -2]
+  Combined_VVI_MarshClass <- read.csv(paste(defaultdir,"/tables/Combined_VVI_MarshClass/",i,"_Combined_VVI_MarshClass.csv", 
+                                            sep=""), header = TRUE,sep = ",")
+  a <- inner_join(Combined_VVI_MarshClass, Combined_Hydro_filtered, by = "Site_id")
+  write.csv(a, paste(defaultdir,"/tables/Combined_VVI_MarshClass_HydroFiltered/",i ,"_Combined_VVI_MarshClass_HydroFiltered.csv",sep=""), row.names = FALSE)
+}
+remove(a, i, Combined_Hydro_filtered, Combined_VVI_MarshClass)
+
+
+a <- read.csv(paste(defaultdir,"/tables/Combined_Hydro_filtered/", "Total_Combined_Hydro_filtered.csv",sep=""),
+                          header = TRUE,sep = ",")
+b <- read.csv(paste(defaultdir,"/tables/Combined_VVI_MarshClass/", "Total_Combined_VVI_MarshClass.csv",sep=""),
+                          header = TRUE,sep = ",")
+
+a <- inner_join(b, a, by = "Site_id")
+write.csv(a, paste(defaultdir,"/tables/Combined_VVI_MarshClass_HydroFiltered/", "Total_Combined_VVI_MarshClass_HydroFiltered.csv",sep=""), row.names = FALSE)
+remove(a, b)
+
+
+
+```
+
+
+

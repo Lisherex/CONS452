@@ -1,0 +1,62 @@
+```{r}
+defaultdir <- getwd()
+dir.create("graphs")
+# "/graphs/"
+# setwd(paste(defaultdir,"/graphs/", sep = ""))
+dir.create("tables")
+# setwd(paste(defaultdir,"/tables/", sep = ""))
+
+
+```
+
+```{r, loading packages, include=TRUE, echo=FALSE}
+#Adding the required packages for this file. Don't change the current order, and add new packages to the first.
+packages <- c(
+  "ggplot2", 
+  "tidyverse", 
+  "dplyr",
+  "corrplot",
+  "Hmisc"
+  ) 
+if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
+  install.packages(setdiff(packages, rownames(installed.packages())))
+  lapply(packages, library, character.only = TRUE)
+} else {
+  lapply(packages, library, character.only = TRUE)
+}
+#Adding the required packages for this file. Don't change the current order, and add new packages to the first.
+
+```
+
+```{r}
+setwd(paste(defaultdir,"/tables/", sep = ""))
+dir.create("Combined_VVI_MarshClass")
+
+setwd(defaultdir)
+VVI <- read.csv(paste(defaultdir,"/tables/Combined_VVI/", "Total_Combined_VVI.csv",sep=""),
+                          header = TRUE,sep = ",")
+MarshClass <- read.csv(paste(defaultdir,"/tables/Combined_MarshClass/", "Total_Combined_MarshClass.csv",sep=""),
+                          header = TRUE,sep = ",")
+VVI$Site_id <- paste(VVI$Site_id, "_", VVI$veg_year, sep = "")
+MarshClass$Site_id <- paste(MarshClass$Site_id, "_", MarshClass$veg_year, sep = "")
+MarshClass <- MarshClass[, c(-2,-3,-4)]
+a <- inner_join(MarshClass, VVI, by = "Site_id")
+write.csv(a, paste(defaultdir,"/tables/Combined_VVI_MarshClass/", "Total_Combined_VVI_MarshClass.csv",sep=""), row.names = FALSE)
+
+for(i in 2006:2019){
+  VVI <- read.csv(paste(defaultdir,"/tables/Combined_VVI/", i, "_Combined_VVI.csv",sep=""),
+                          header = TRUE,sep = ",")
+  MarshClass <- read.csv(paste(defaultdir,"/tables/Combined_MarshClass/",i , "_Combined_MarshClass.csv",sep=""),
+                          header = TRUE,sep = ",")
+  
+  VVI$Site_id <- paste(VVI$Site_id, "_", VVI$veg_year, sep = "")
+  MarshClass$Site_id <- paste(MarshClass$Site_id, "_", MarshClass$veg_year, sep = "")
+  MarshClass <- MarshClass[, c(-2,-3,-4)]
+  a <- inner_join(MarshClass, VVI, by = "Site_id")
+  write.csv(a, paste(defaultdir,"/tables/Combined_VVI_MarshClass/", i, "_Combined_VVI_MarshClass.csv",sep=""), row.names = FALSE)
+}
+
+```
+
+
+

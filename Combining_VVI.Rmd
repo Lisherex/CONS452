@@ -1,0 +1,69 @@
+```{r}
+defaultdir <- getwd()
+dir.create("graphs")
+# "/graphs/"
+# setwd(paste(defaultdir,"/graphs/", sep = ""))
+dir.create("tables")
+# setwd(paste(defaultdir,"/tables/", sep = ""))
+
+
+```
+
+```{r, loading packages, include=TRUE, echo=FALSE}
+#Adding the required packages for this file. Don't change the current order, and add new packages to the first.
+packages <- c(
+  "ggplot2", 
+  "tidyverse", 
+  "dplyr",
+  "corrplot",
+  "Hmisc"
+  ) 
+if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
+  install.packages(setdiff(packages, rownames(installed.packages())))
+  lapply(packages, library, character.only = TRUE)
+} else {
+  lapply(packages, library, character.only = TRUE)
+}
+#Adding the required packages for this file. Don't change the current order, and add new packages to the first.
+
+```
+
+```{r}
+setwd(paste(defaultdir,"/tables/", sep = ""))
+dir.create("Combined_VVI")
+# setwd(paste(defaultdir,"/tables/Combined_VVI/", sep = ""))
+
+
+
+## Combine VVI and Coordinates together
+setwd(defaultdir)
+b <- c("Site_id", "Longitude", "Latitude", "veg_year", "Percent_Cover_Tree(m??)", "Percent_Cover_Shrub(m??)", "Percent_Cover_Herb(m??)", "Percent_Cover_Carpet(m??)", "Avg_Height_Tree(m)", "Avg_Height_Shrub(m)", "Avg_Height_Herb(m)", "Avg_Height_Carpet(m)", "Volume_Tree(m??)", "Volume_Shrub(m??)", "Volume_Herb(m??)", "Volume_Carpet(m??)", "Volume_Vegetation(m??)", "VVI")
+for (i in 2006:2019){
+  VVI = read.csv(paste(defaultdir,"/data/VegetationVolumeIndex/",i,".csv",sep=""),
+                     header = TRUE,sep = ",")
+  VVI_Coordinates = read.csv(paste(defaultdir,"/data/VegetationVolumeIndex/",i, "_Coordinates.csv",sep=""),
+                          header = TRUE,sep = ",")
+  names(VVI)[1] <- "Site_id"
+  names(VVI_Coordinates)[1] <- "Site_id"
+  a <- inner_join(VVI_Coordinates, VVI, by = "Site_id")
+  a <- a[,c(-4,-20)]
+  for (j in 1:18){
+    names(a)[j] <- b[j]
+  }
+  write.csv(a, paste(defaultdir,"/tables/Combined_VVI/",i ,"_Combined_VVI.csv",sep=""), row.names = FALSE)
+}
+remove(a, b, i, j, VVI, VVI_Coordinates)
+## Combine VVI and Coordinates together
+
+## Add all years' observation together
+setwd(paste(defaultdir,"/tables/Combined_VVI/", sep = ""))
+a <- read.csv("2006_Combined_VVI.csv", header = TRUE,sep = ",")
+for(i in 2006:2018){
+  a <- rbind(a, read.csv(paste(i+1, "_Combined_VVI.csv", sep = ""), header = TRUE,sep = ","))
+}
+write.csv(a, paste(defaultdir,"/tables/Combined_VVI/","Total" ,"_Combined_VVI.csv",sep=""), row.names = FALSE)
+remove(a, b, i)
+## Add all years' observation together
+
+```
+
