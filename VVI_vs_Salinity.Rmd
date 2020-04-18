@@ -1,0 +1,391 @@
+```{r}
+defaultdir <- getwd()
+dir.create("graphs")
+# "/graphs/"
+# setwd(paste(defaultdir,"/graphs/", sep = ""))
+dir.create("tables")
+# setwd(paste(defaultdir,"/tables/", sep = ""))
+dir.create("rds")
+# setwd(paste(defaultdir,"/rds/", sep = ""))
+
+```
+
+```{r, loading packages, include=TRUE, echo=FALSE}
+#Adding the required packages for this file. Don't change the current order, and add new packages to the first.
+packages <- c(
+  "ggplot2", 
+  "tidyverse", 
+  "dplyr",
+  "corrplot",
+  "Hmisc", 
+  "gridExtra", 
+  "ggrepel"
+  ) 
+if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
+  install.packages(setdiff(packages, rownames(installed.packages())))
+  lapply(packages, library, character.only = TRUE)
+} else {
+  lapply(packages, library, character.only = TRUE)
+}
+#Adding the required packages for this file. Don't change the current order, and add new packages to the first.
+
+```
+
+
+```{r}
+setwd(paste(defaultdir,"/tables/", sep = ""))
+dir.create("Average_VVI_Salinity")
+setwd(defaultdir)
+
+for(i in 2006:2019){
+  a = read.csv(paste(defaultdir, 
+                     "/tables/Combined_VVI_MarshClass_HydroFiltered/", 
+                     i,"_Combined_VVI_MarshClass_HydroFiltered.csv",sep=""),
+                     header = TRUE,sep = ",") 
+  a <- subset(a, a$Marsh_Class != "Swamp") #Removing swamp from the dataaset, casuse there are no data for swamp.
+  a <- a[, c(2, 6 , 20, 23)]
+  a <- a %>%
+  group_by(Marsh_Class) %>%
+  summarise_at(vars(), funs(mean(., na.rm=TRUE))) 
+  write.csv(a, paste(defaultdir,"/tables/Average_VVI_Salinity/",i ,"_Average_VVI_Salinity.csv",sep=""), row.names = FALSE)
+}
+
+setwd(paste(defaultdir,"/tables/Average_VVI_Salinity/", sep = ""))
+a <- read.csv(paste(2006, "_Average_VVI_Salinity.csv", sep = ""), header = TRUE,sep = ",")
+for(i in 2006:2018){
+  a <- rbind(a, read.csv(paste(i+1, "_Average_VVI_Salinity.csv", sep = ""), header = TRUE,sep = ","))
+}
+write.csv(a, paste(defaultdir,"/tables/Average_VVI_Salinity/" ,"Total_Average_VVI_Salinit.csv",sep=""), row.names = FALSE)
+
+remove(a)
+```
+
+```{r}
+setwd(defaultdir)
+AveVVI_vs_AveSal <- read.csv(paste(defaultdir,"/tables/Average_VVI_Salinity/", "Total_Average_VVI_Salinit.csv",sep=""),
+                          header = TRUE,sep = ",")
+names(AveVVI_vs_AveSal)[4] <- "Average_Salinity"
+names(AveVVI_vs_AveSal)[3] <- "Average_VVI"
+
+AveVVI_vs_AveSal_plot <- ggplot(AveVVI_vs_AveSal,aes(x=Average_Salinity,y=Average_VVI)) +
+  geom_point() + 
+  geom_label_repel(aes(label = veg_year, fill = Marsh_Class), color = 'white',
+                    size = 3.5) + 
+  facet_grid(~Marsh_Class,scales = "free_x") + 
+  labs(x="Salinity (ppt)", y= "Average Vegetation Volum Index (VVI)") + 
+  theme(legend.position = "none") + 
+  scale_x_continuous(limits = c(0, NA)) + 
+  theme(panel.background = element_rect(fill = 'white', colour = 'black'), legend.position = "none", panel.border = element_rect(fill = NA, colour = "black"), strip.background = element_rect(fill = "grey", colour = "white"))
+
+AveVVI_vs_AveSal_plot
+grDevices:::recordPlot() %>% 
+  saveRDS(., file = paste(defaultdir,"/rds/AveVVI_vs_AveSal_plot.rds", sep = ""))
+cor.test(AveVVI_vs_AveSal$Average_Salinity, AveVVI_vs_AveSal$Average_VVI)
+#################
+
+AveVVI_vs_AveSal_Brackish <- subset(AveVVI_vs_AveSal, Marsh_Class == "Brackish")
+AveVVI_vs_AveSal_plot_Brackish <- ggplot(AveVVI_vs_AveSal_Brackish,aes(x=Average_Salinity,y=Average_VVI)) +
+  geom_point(aes(colour= Marsh_Class, shape = Marsh_Class), alpha = 1, size = 3) + 
+  labs(x="Salinity (ppt)", y= "Average Vegetation Volum Index (VVI)")  + 
+  guides(color=guide_legend("Marsh Types"), shape = guide_legend("Marsh Types"))
+
+AveVVI_vs_AveSal_plot_Brackish
+grDevices:::recordPlot() %>% 
+  saveRDS(., file = paste(defaultdir,"/rds/AveVVI_vs_AveSal_plot_Brackish.rds", sep = ""))
+cor.test(AveVVI_vs_AveSal_Brackish$Average_Salinity, AveVVI_vs_AveSal_Brackish$Average_VVI)
+#################
+
+AveVVI_vs_AveSal_Fresh <- subset(AveVVI_vs_AveSal, Marsh_Class == "Fresh")
+AveVVI_vs_AveSal_plot_Fresh <- ggplot(AveVVI_vs_AveSal_Fresh,aes(x=Average_Salinity,y=Average_VVI)) +
+  geom_point(aes(colour= Marsh_Class, shape = Marsh_Class), alpha = 1, size = 3) + 
+  labs(x="Salinity (ppt)", y= "Average Vegetation Volum Index (VVI)")  + 
+  guides(color=guide_legend("Marsh Types"), shape = guide_legend("Marsh Types"))
+
+AveVVI_vs_AveSal_plot_Fresh
+grDevices:::recordPlot() %>% 
+  saveRDS(., file = paste(defaultdir,"/rds/AveVVI_vs_AveSal_plot_Fresh.rds", sep = ""))
+cor.test(AveVVI_vs_AveSal_Fresh$Average_Salinity, AveVVI_vs_AveSal_Fresh$Average_VVI)
+#################
+
+AveVVI_vs_AveSal_Intermediate <- subset(AveVVI_vs_AveSal, Marsh_Class == "Intermediate")
+AveVVI_vs_AveSal_plot_Intermediate <- ggplot(AveVVI_vs_AveSal_Intermediate,aes(x=Average_Salinity,y=Average_VVI)) +
+  geom_point(aes(colour= Marsh_Class, shape = Marsh_Class), alpha = 1, size = 3) + 
+  labs(x="Salinity (ppt)", y= "Average Vegetation Volum Index (VVI)")  + 
+  guides(color=guide_legend("Marsh Types"), shape = guide_legend("Marsh Types"))
+
+AveVVI_vs_AveSal_plot_Intermediate
+grDevices:::recordPlot() %>% 
+  saveRDS(., file = paste(defaultdir,"/rds/AveVVI_vs_AveSal_plot_Intermediate.rds", sep = ""))
+cor.test(AveVVI_vs_AveSal_Intermediate$Average_Salinity, AveVVI_vs_AveSal_Intermediate$Average_VVI)
+#################
+
+AveVVI_vs_AveSal_Saline <- subset(AveVVI_vs_AveSal, Marsh_Class == "Saline")
+AveVVI_vs_AveSal_plot_Saline <- ggplot(AveVVI_vs_AveSal_Saline,aes(x=Average_Salinity,y=Average_VVI)) +
+  geom_point(aes(colour= Marsh_Class, shape = Marsh_Class), alpha = 1, size = 3) + 
+  labs(x="Salinity (ppt)", y= "Average Vegetation Volum Index (VVI)")  + 
+  guides(color=guide_legend("Marsh Types"), shape = guide_legend("Marsh Types"))
+
+AveVVI_vs_AveSal_plot_Saline
+grDevices:::recordPlot() %>% 
+  saveRDS(., file = paste(defaultdir,"/rds/AveVVI_vs_AveSal_plot_Saline.rds", sep = ""))
+cor.test(AveVVI_vs_AveSal_Saline$Average_Salinity, AveVVI_vs_AveSal_Saline$Average_VVI)
+#################
+#Pearson correlation coefficient, r
+
+```
+
+```{r}
+setwd(defaultdir)
+Brackish <- subset(AveVVI_vs_AveSal, Marsh_Class == "Brackish")
+
+Brackish_plot <- ggplot(Brackish,aes(x=veg_year,y=Average_VVI)) +
+  geom_point(aes(colour= Marsh_Class, shape = Marsh_Class), alpha = 1, size = 3) + 
+  labs(x="Year", y= "Average Vegetation Volum Index (VVI)") + 
+  guides(color=guide_legend("Marsh Type"), shape = guide_legend("Marsh Type"))
+
+Brackish_plot
+###########
+
+Fresh <- subset(AveVVI_vs_AveSal, Marsh_Class == "Fresh")
+
+Fresh_plot <- ggplot(Fresh,aes(x=veg_year,y=Average_VVI)) +
+  geom_point(aes(colour= Marsh_Class, shape = Marsh_Class), alpha = 1, size = 3) + 
+  labs(x="Year", y= "Average Vegetation Volum Index (VVI)") + 
+  guides(color=guide_legend("Marsh Type"), shape = guide_legend("Marsh Type"))
+Fresh_plot
+
+###########
+Intermediate <- subset(AveVVI_vs_AveSal, Marsh_Class == "Intermediate")
+
+Intermediate_plot <- ggplot(Intermediate,aes(x=veg_year,y=Average_VVI)) +
+  geom_point(aes(colour= Marsh_Class, shape = Marsh_Class), alpha = 1, size = 3) + 
+  labs(x="Year", y= "Average Vegetation Volum Index (VVI)") + 
+  guides(color=guide_legend("Marsh Type"), shape = guide_legend("Marsh Type"))
+Intermediate_plot
+
+###########
+Saline <- subset(AveVVI_vs_AveSal, Marsh_Class == "Saline")
+
+Saline_plot <- ggplot(Saline,aes(x=veg_year,y=Average_VVI)) +
+  geom_point(aes(colour= Marsh_Class, shape = Marsh_Class), alpha = 1, size = 3) + 
+  labs(x="Year", y= "Average Vegetation Volum Index (VVI)") + 
+  guides(color=guide_legend("Marsh Type"), shape = guide_legend("Marsh Type"))
+Saline_plot
+
+```
+
+```{r}
+setwd(defaultdir)
+Brackish <- subset(AveVVI_vs_AveSal, Marsh_Class == "Brackish")
+###########
+
+Brackish_plot <- ggplot(Brackish,aes(x=veg_year,y=Average_Salinity)) +
+  geom_point(alpha = 1, size = 3) + 
+  labs(x="Year", y= "Average Salinity (ppt)") + 
+  guides(color=guide_legend("Marsh Type"), shape = guide_legend("Marsh Type")) + 
+  theme(legend.position = c(0.85, 0.97), 
+        legend.text = element_text(size=10, 
+                                   face="bold"),
+        legend.title = element_blank()
+        ) + 
+  geom_smooth(method = "lm", se = FALSE) + 
+  theme(legend.position = "none", panel.background = element_rect(fill = 'white', colour = 'black')) + 
+  annotation_custom(grobTree(textGrob("Brackish", x=0.87,  y=0.97, hjust=0,
+  gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
+  annotation_custom(grobTree(textGrob("p-value = 0.003", x=0.77,  y=0.90, hjust=0,
+  gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
+  annotation_custom(grobTree(textGrob(" Pearson correlation coefficient, r = -0.73", x=0.41,  y=0.83, hjust=0,
+  gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
+  scale_x_continuous(labels = as.character(AveVVI_vs_AveSal$veg_year), breaks = AveVVI_vs_AveSal$veg_year)
+Brackish_plot
+
+cor.test(Brackish$Average_Salinity, Brackish$veg_year)
+
+###########
+
+Fresh <- subset(AveVVI_vs_AveSal, Marsh_Class == "Fresh")
+
+Fresh_plot <- ggplot(Fresh,aes(x=veg_year,y=Average_Salinity)) +
+  geom_point(alpha = 1, size = 3) + 
+  labs(x="Year", y= "Average Salinity (ppt)") + 
+  guides(color=guide_legend("Marsh Type"), shape = guide_legend("Marsh Type"))  + 
+  theme(legend.position = c(0.88, 0.97), 
+        legend.text = element_text(size=10, 
+                                   face="bold"),
+        legend.title = element_blank()
+        ) + 
+  geom_smooth(method = "lm", se = FALSE) + 
+  theme(legend.position = "none", panel.background = element_rect(fill = 'white', colour = 'black')) + 
+  annotation_custom(grobTree(textGrob("Fresh", x=0.91,  y=0.97, hjust=0,
+  gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
+  annotation_custom(grobTree(textGrob("p-value = 0.02", x=0.789,  y=0.90, hjust=0,
+  gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
+  annotation_custom(grobTree(textGrob(" Pearson correlation coefficient, r = -0.61", x=0.41,  y=0.83, hjust=0,
+  gp=gpar(col="black", fontsize=15, fontface="italic")))) +   
+  scale_x_continuous(labels = as.character(AveVVI_vs_AveSal$veg_year), breaks = AveVVI_vs_AveSal$veg_year)
+Fresh_plot
+
+cor.test(Fresh$Average_Salinity, Fresh$veg_year)
+
+###########
+Intermediate <- subset(AveVVI_vs_AveSal, Marsh_Class == "Intermediate")
+
+Intermediate_plot <- ggplot(Intermediate,aes(x=veg_year,y=Average_Salinity)) +
+  geom_point(alpha = 1, size = 3) + 
+  labs(x="Year", y= "Average Salinity (ppt)") + 
+  guides(color=guide_legend("Marsh Type"), shape = guide_legend("Marsh Type"))  + 
+  theme(legend.position = c(0.8, 0.97), 
+        legend.text = element_text(size=10, 
+                                   face="bold"),
+        legend.title = element_blank()
+        ) + 
+  geom_smooth(method = "lm", se = FALSE) + 
+  theme(legend.position = "none", panel.background = element_rect(fill = 'white', colour = 'black')) + 
+  annotation_custom(grobTree(textGrob("Intermediate", x=0.82,  y=0.97, hjust=0,
+  gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
+  annotation_custom(grobTree(textGrob("p-value = 0.0007", x=0.757,  y=0.90, hjust=0,
+  gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
+  annotation_custom(grobTree(textGrob(" Pearson correlation coefficient, r = -0.79", x=0.42,  y=0.83, hjust=0,
+  gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
+  scale_x_continuous(labels = as.character(AveVVI_vs_AveSal$veg_year), breaks = AveVVI_vs_AveSal$veg_year)
+Intermediate_plot
+
+cor.test(Intermediate$Average_Salinity, Intermediate$veg_year)
+
+###########
+Saline <- subset(AveVVI_vs_AveSal, Marsh_Class == "Saline")
+
+Saline_plot <- ggplot(Saline,aes(x=veg_year,y=Average_Salinity)) +
+  geom_point(alpha = 1, size = 3) + 
+  labs(x="Year", y= "Average Salinity (ppt)") + 
+  guides(color=guide_legend("Marsh Type"), shape = guide_legend("Marsh Type"))  + 
+  theme(legend.position = c(0.87, 0.98), 
+        legend.text = element_text(size=10, 
+                                   face="bold"),
+        legend.title = element_blank()
+        ) + 
+  geom_smooth(method = "lm", se = FALSE) + 
+  theme(legend.position = "none", panel.background = element_rect(fill = 'white', colour = 'black')) + 
+  annotation_custom(grobTree(textGrob("Saline", x=0.9,  y=0.97, hjust=0,
+  gp=gpar(col="black", fontsize=15, fontface="italic")))) +  
+  annotation_custom(grobTree(textGrob("p-value = 0.02", x=0.78,  y=0.90, hjust=0,
+  gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
+  annotation_custom(grobTree(textGrob(" Pearson correlation coefficient, r = -0.61", x=0.40,  y=0.83, hjust=0,
+  gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
+  scale_x_continuous(labels = as.character(AveVVI_vs_AveSal$veg_year), breaks = AveVVI_vs_AveSal$veg_year)
+Saline_plot
+
+cor.test(Saline$Average_Salinity, Saline$veg_year)
+
+grid.arrange(Brackish_plot, Fresh_plot ,Intermediate_plot, Saline_plot, nrow = 2)
+####################
+
+AveVVI_vs_year_plot <- ggplot(AveVVI_vs_AveSal,aes(x=veg_year,y=Average_Salinity)) +
+  geom_point() + 
+  facet_grid(~Marsh_Class,scales = "free_x") + 
+  labs(x="Year", y= "Salinity (ppt)") + 
+  theme(legend.position = "none") + 
+  theme(panel.background = element_rect(fill = 'white', colour = 'black'), legend.position = "none", panel.border = element_rect(fill = NA, colour = "black"), strip.background = element_rect(fill = "grey", colour = "white"), axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  scale_x_continuous(labels = as.character(AveVVI_vs_AveSal$veg_year), breaks = AveVVI_vs_AveSal$veg_year) + 
+  geom_smooth(method = "lm", se = FALSE)
+
+AveVVI_vs_year_plot
+
+cor.test(AveVVI_vs_AveSal$Average_Salinity, AveVVI_vs_AveSal$veg_year)
+
+```
+
+
+
+```{r}
+setwd(defaultdir)
+Brackish <- subset(AveVVI_vs_AveSal, Marsh_Class == "Brackish")
+###########
+
+Brackish_plot <- ggplot(Brackish,aes(x=veg_year,y=Average_VVI)) +
+  geom_point(alpha = 1, size = 3) + 
+  labs(x="Year", y= "Average Vegetation Volum Index") + 
+  guides(color=guide_legend("Marsh Type"), shape = guide_legend("Marsh Type")) + 
+  theme(legend.position = c(0.85, 0.97), 
+        legend.text = element_text(size=10, 
+                                   face="bold"),
+        legend.title = element_blank()
+        ) + 
+  theme(legend.position = "none", panel.background = element_rect(fill = 'white', colour = 'black')) + 
+  scale_x_continuous(labels = as.character(AveVVI_vs_AveSal$veg_year), breaks = AveVVI_vs_AveSal$veg_year)
+Brackish_plot
+
+cor.test(Brackish$Average_VVI, Brackish$veg_year)
+
+###########
+
+Fresh <- subset(AveVVI_vs_AveSal, Marsh_Class == "Fresh")
+
+Fresh_plot <- ggplot(Fresh,aes(x=veg_year,y=Average_VVI)) +
+  geom_point(alpha = 1, size = 3) + 
+  labs(x="Year", y= "Average Vegetation Volum Index") + 
+  guides(color=guide_legend("Marsh Type"), shape = guide_legend("Marsh Type"))  + 
+  theme(legend.position = c(0.88, 0.97), 
+        legend.text = element_text(size=10, 
+                                   face="bold"),
+        legend.title = element_blank()
+        ) + 
+  theme(legend.position = "none", panel.background = element_rect(fill = 'white', colour = 'black')) + 
+  scale_x_continuous(labels = as.character(AveVVI_vs_AveSal$veg_year), breaks = AveVVI_vs_AveSal$veg_year)
+Fresh_plot
+
+cor.test(Fresh$Average_VVI, Fresh$veg_year)
+
+###########
+Intermediate <- subset(AveVVI_vs_AveSal, Marsh_Class == "Intermediate")
+
+Intermediate_plot <- ggplot(Intermediate,aes(x=veg_year,y=Average_VVI)) +
+  geom_point(alpha = 1, size = 3) + 
+  labs(x="Year", y= "Average Vegetation Volum Index") + 
+  guides(color=guide_legend("Marsh Type"), shape = guide_legend("Marsh Type"))  + 
+  theme(legend.position = c(0.8, 0.97), 
+        legend.text = element_text(size=10, 
+                                   face="bold"),
+        legend.title = element_blank()
+        ) + 
+  theme(legend.position = "none", panel.background = element_rect(fill = 'white', colour = 'black')) + 
+  scale_x_continuous(labels = as.character(AveVVI_vs_AveSal$veg_year), breaks = AveVVI_vs_AveSal$veg_year)
+Intermediate_plot
+
+cor.test(Intermediate$Average_VVI, Intermediate$veg_year)
+
+###########
+Saline <- subset(AveVVI_vs_AveSal, Marsh_Class == "Saline")
+
+Saline_plot <- ggplot(Saline,aes(x=veg_year,y=Average_VVI)) +
+  geom_point(alpha = 1, size = 3) + 
+  labs(x="Year", y= "Average Vegetation Volum Index") + 
+  guides(color=guide_legend("Marsh Type"), shape = guide_legend("Marsh Type"))  + 
+  theme(legend.position = c(0.87, 0.98), 
+        legend.text = element_text(size=10, 
+                                   face="bold"),
+        legend.title = element_blank()
+        ) + 
+  theme(legend.position = "none", panel.background = element_rect(fill = 'white', colour = 'black')) + 
+  scale_x_continuous(labels = as.character(AveVVI_vs_AveSal$veg_year), breaks = AveVVI_vs_AveSal$veg_year)
+Saline_plot
+
+cor.test(Saline$Average_VVI, Saline$veg_year)
+
+grid.arrange(Brackish_plot, Fresh_plot ,Intermediate_plot, Saline_plot, nrow = 2)
+####################
+
+AveVVI_vs_year_plot <- ggplot(AveVVI_vs_AveSal,aes(x=veg_year,y=Average_VVI)) +
+  geom_point() + 
+  facet_grid(~Marsh_Class,scales = "free_x") + 
+  labs(x="Year", y= "Salinity (ppt)") + 
+  theme(legend.position = "none") + 
+  theme(panel.background = element_rect(fill = 'white', colour = 'black'), legend.position = "none", panel.border = element_rect(fill = NA, colour = "black"), strip.background = element_rect(fill = "grey", colour = "white"), axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  scale_x_continuous(labels = as.character(AveVVI_vs_AveSal$veg_year), breaks = AveVVI_vs_AveSal$veg_year) + 
+  geom_smooth(method = "lm", se = FALSE)
+
+AveVVI_vs_year_plot
+
+cor.test(AveVVI_vs_AveSal$Average_VVI, AveVVI_vs_AveSal$veg_year)
+
+```

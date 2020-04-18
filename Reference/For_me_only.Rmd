@@ -1,0 +1,518 @@
+```{r setup, include=TRUE, echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+```{r, Input Variabels, include=TRUE, echo=FALSE}
+
+#highlight_var  = "prenatal_group"
+#variable_to_filter_by1 = "drug_group"
+#filter_by1 = "No drug"
+#variable_to_filter_by2 = ""
+#filter_by2 = ""
+
+```
+
+```{r, Set variables and please dont change, include=TRUE, echo=FALSE}
+
+otu_file       = "Prenatal_alcohol_exposure_16S_otu_table.txt"
+metadata_file  = "Prenatal_alcohol_exposure_metadata.txt"
+files_are_csv  = FALSE
+sample_ID_col  = "MI_ID"
+otu_as_rows    = TRUE
+otu_col_to_ignore = c()
+otu_row_to_ignore = c()
+
+```
+
+```{r, Source Functions, include=TRUE, echo=FALSE}
+
+defaultdir <- getwd()
+if (!requireNamespace("BiocManager", quietly = TRUE))
+install.packages("BiocManager")
+
+#BiocManager::install("DESeq2")
+#BiocManager::install("phyloseq")
+
+library(tidyverse)
+library(vegan)
+library(gridExtra)
+library(phyloseq)
+library(labdsv)
+library(indicspecies)
+library(DESeq2)
+
+
+source(paste(defaultdir,"/R_Source/BIOL448J_Functions.R",sep=""))
+source(paste(defaultdir,"/R_Source/pairwise.adonis.r",sep=""))
+source(paste(defaultdir,"/R_Source/my_colours.R",sep=""))
+combine_pvalues = function(p){
+  return(1-pchisq(-2*sum(log(p),na.rm=T),2*sum(!is.na(p))))
+}
+
+```
+
+```{r, making subdirectores}
+
+dir.create("graph")
+# setwd(paste(defaultdir,"/graph",sep=""))
+
+```
+
+```{r, Read and Clean data, include=TRUE, echo=FALSE}
+pae_otu = read.table(paste(defaultdir,"/data/",otu_file,sep=""),
+                     header = TRUE,sep = "\t")
+pae_metadata = read.table(paste(defaultdir,"/data/",metadata_file,sep=""),
+                          header = TRUE,sep = "\t")
+
+rownames(pae_otu) <- paste("OTU",pae_otu[,1],sep = "")
+rownames(pae_metadata) <- paste(pae_metadata$MI_ID,sep = "")
+
+pae_metadata <- pae_metadata[order(pae_metadata$MI_ID),]
+
+pae_otu <- pae_otu[,-(1:2)]
+
+#Delete Blank13 and MI_ID40
+pae_metadata <- pae_metadata[-c(1,40),]
+#Delete Blank13 and MI_ID40
+
+pae_tax <- as.matrix(pae_otu[,(66:73)])
+pae_otu <- pae_otu[,(1:65)]
+pae_metadata_otu <- as.data.frame(cbind(pae_metadata,
+                                        as.data.frame(t(pae_otu))
+                                        )
+                                  )
+
+metadata_cols <- (1:ncol(pae_metadata))
+otu_cols <- ((ncol(pae_metadata)+1):(ncol(as.data.frame(t(pae_otu)))+ncol(pae_metadata)))
+
+```
+
+
+
+```{r}
+
+a <- pae_metadata_otu
+
+alphameasures = run_all_diversity(a, 
+                                  species_col = -c(1:8), 
+                                  filter_by = "MI_ID"
+                                  )
+
+ggplot(alphameasures,aes=(x=drug_group, y=richness)) +
+  geom_boxplot() +
+  geom_point(alpha=0.6,position = position_jitter(width = 0.1)) +
+  facet_grid(~region)
+
+
+```
+
+##############################################
+```{r, Group data by Family, include=TRUE, echo=FALSE}
+
+
+pae_otu_tax_byFamily <- as.data.frame(cbind(pae_otu,pae_tax))
+
+
+pae_otu_tax_byFamily = group_by(pae_otu_tax_byFamily, Rank1, Rank2, Rank3, Rank4, Rank5)
+pae_otu_tax_byFamily = summarise_if(pae_otu_tax_byFamily, is.numeric, sum, na.rm=TRUE)
+
+
+
+nameshere <- paste("Phylum(",pae_otu_tax_byFamily$Rank2,")_","Family(",pae_otu_tax_byFamily$Rank5,")",sep="")
+
+pae_otu_byFamily_t <- as.data.frame(t(pae_otu_tax_byFamily[6:70]))
+
+```
+
+```{r, Relative Abundance Analysis, include=TRUE, echo=FALSE}
+meta <- pae_metadata_otu[,c(1:8)]
+otu <- pae_otu_byFamily_t[c(1:65),]
+
+colnames(otu) <- nameshere
+
+meta$total_abundance <- rowSums(pae_metadata_otu[,-c(1:8)])
+
+otu_and_metadata <- as.data.frame(cbind(meta,otu))
+
+
+PAE_grouped <- gather(otu_and_metadata, key = "Rank5",value = "abundance",-(1:9))
+
+plotrelative_abundance_allOTU <- ggplot(PAE_grouped,aes(x=MI_ID,y=(abundance)*100,fill=Rank5))+
+  geom_bar(stat = "identity",position = "fill",color="white") +
+  facet_grid(as.formula(paste("~","drug_group")),scales = "free_x", space = "free")+
+  theme(legend.position = "none",
+    axis.text.x = element_text(angle=-90, size= 7),
+    axis.ticks.x = element_blank())+
+  labs(x="Sample ID", y= " Relative Abundance")
+
+pdf(paste("drug_group_by_Family","-RelativeAbundance AllOTU Plot.pdf"))
+    
+plotrelative_abundance_allOTU
+ 
+dev.off()
+
+```
+
+```{r, Plotting Relative Abundance for the top 25 OTUs, include=TRUE, echo=FALSE}
+meta <- pae_metadata_otu[,c(1:8)]
+otu <- pae_otu_byFamily_t[c(1:65),]
+
+colnames(otu) <- nameshere
+
+meta$total_abundance <- rowSums(pae_metadata_otu[,-c(1:8)])
+
+otu_and_metadata <- as.data.frame(cbind(meta,otu))
+
+
+PAE_taxa_abundance <- colSums(otu_and_metadata[,-c(1:8)])
+N=25
+
+top_N_taxa <- names(sort(PAE_taxa_abundance,decreasing = TRUE)[1:N])
+
+
+PAE_grouped <- gather(otu_and_metadata, key = "Rank5",value = "abundance",-(1:9))
+
+PAE_top_N <- filter(PAE_grouped, Rank5 %in% top_N_taxa)
+
+plotrelative_abundance_allOTU <- ggplot(PAE_top_N,aes(x=MI_ID,y=(abundance)*100,fill=Rank5))+
+  geom_bar(stat = "identity",position = "fill",color="white") +
+  facet_grid(as.formula(paste("~","drug_group")),scales = "free_x", space = "free")+
+  theme(legend.position = "none",
+    axis.text.x = element_text(angle=-90, size= 7),
+    axis.ticks.x = element_blank())+
+  labs(x="Sample ID", y= " Relative Abundance")
+
+pdf(paste("drug_group_by_Family","-RelativeAbundance Top_25_OTU Plot.pdf"))
+    
+plotrelative_abundance_allOTU
+ 
+dev.off()
+
+```
+
+```{r}
+meta <- pae_metadata_otu[,c(1:8)]
+otu <- pae_otu_byFamily_t[c(1:65),]
+
+colnames(otu) <- nameshere
+
+meta$total_abundance <- rowSums(pae_metadata_otu[,-c(1:8)])
+
+otu_and_metadata <- as.data.frame(cbind(meta,otu))
+
+
+PAE_taxa_abundance <- colSums(otu_and_metadata[,-c(1:8)])
+N=25
+
+top_N_taxa <- names(sort(PAE_taxa_abundance,decreasing = FALSE)[1:N])
+
+
+PAE_grouped <- gather(otu_and_metadata, key = "Rank5",value = "abundance",-(1:9))
+
+PAE_top_N <- filter(PAE_grouped, Rank5 %in% top_N_taxa)
+
+plotrelative_abundance_allOTU <- ggplot(PAE_top_N,aes(x=MI_ID,y=(abundance)*100,fill=Rank5))+
+  geom_bar(stat = "identity",position = "fill",color="white") +
+  facet_grid(as.formula(paste("~","drug_group")),scales = "free_x", space = "free")+
+  theme(legend.position = "none",
+    axis.text.x = element_text(angle=-90, size= 7),
+    axis.ticks.x = element_blank())+
+  labs(x="Sample ID", y= " Relative Abundance")
+
+pdf(paste("drug_group_by_Family","-RelativeAbundance Rarest",N,"Plot.pdf"))
+    
+plotrelative_abundance_allOTU
+ 
+dev.off()
+```
+
+```{r, Relative Abundance Analysis, include=TRUE, echo=FALSE}
+meta <- pae_metadata_otu[,c(1:8)]
+otu <- pae_otu_byFamily_t[c(1:65),]
+
+colnames(otu) <- nameshere
+
+meta$total_abundance <- rowSums(pae_metadata_otu[,-c(1:8)])
+
+otu_and_metadata <- as.data.frame(cbind(meta,otu))
+
+
+PAE_grouped <- gather(otu_and_metadata, key = "Rank5",value = "abundance",-(1:9))
+
+PAE_grouped <- subset(PAE_grouped, (PAE_grouped$prenatal_group == "Control" & PAE_grouped$drug_group == "No drug")|(PAE_grouped$prenatal_group == "Ethanol" & PAE_grouped$drug_group != "No drug"))
+PAE_grouped[,6] <- paste(PAE_grouped[,6],PAE_grouped[,7])
+PAE_grouped <- PAE_grouped[,-7]
+
+
+
+
+plotrelative_abundance_allOTU <- ggplot(PAE_grouped,aes(x=MI_ID,y=(abundance)*100,fill=Rank5))+
+  geom_bar(stat = "identity",position = "fill",color="white") +
+  facet_grid(as.formula(paste("~","prenatal_group")),scales = "free_x", space = "free")+
+  theme(legend.position = "none",
+    axis.text.x = element_text(angle=-90, size= 7),
+    axis.ticks.x = element_blank())+
+  labs(x="Sample ID", y= " Relative Abundance")
+
+pdf(paste("Relative abundance plot by family, Control-no-drug vs Ethanol-2drugs.pdf"))
+    
+plotrelative_abundance_allOTU
+ 
+dev.off()
+
+```
+
+```{r, Relative Abundance Analysis, include=TRUE, echo=FALSE}
+meta <- pae_metadata_otu[,c(1:8)]
+otu <- pae_otu_byFamily_t[c(1:65),]
+
+colnames(otu) <- nameshere
+
+meta$total_abundance <- rowSums(pae_metadata_otu[,-c(1:8)])
+
+otu_and_metadata <- as.data.frame(cbind(meta,otu))
+
+
+PAE_grouped <- gather(otu_and_metadata, key = "Rank5",value = "abundance",-(1:9))
+
+PAE_grouped <- subset(PAE_grouped, (PAE_grouped$sex == "Male" & PAE_grouped$prenatal_group == "Control" & PAE_grouped$drug_group == "No drug")|(PAE_grouped$sex == "Male" & PAE_grouped$prenatal_group == "Ethanol" & PAE_grouped$drug_group != "No drug"))
+PAE_grouped[,5] <- paste(PAE_grouped[,5],PAE_grouped[,6],PAE_grouped[,7])
+PAE_grouped <- PAE_grouped[,-c(6,7)]
+
+
+
+
+plotrelative_abundance_allOTU <- ggplot(PAE_grouped,aes(x=MI_ID,y=(abundance)*100,fill=Rank5))+
+  geom_bar(stat = "identity",position = "fill",color="white") +
+  facet_grid(as.formula(paste("~","sex")),scales = "free_x", space = "free")+
+  theme(legend.position = "none",
+    axis.text.x = element_text(angle=-90, size= 7),
+    axis.ticks.x = element_blank())+
+  labs(x="Sample ID", y= " Relative Abundance")
+
+pdf(paste("Relative abundance plot by family, Male only Control-no-drug vs Ethanol-2drugs.pdf"))
+    
+plotrelative_abundance_allOTU
+ 
+dev.off()
+
+```
+
+####################Family##########################
+
+```{r, Group data by ASV, include=TRUE, echo=FALSE}
+
+pae_otu_tax_byASV <- as.data.frame(cbind(pae_tax,pae_otu))
+otu <- pae_otu_tax_byASV[,c(9:73)]
+meta <- pae_metadata_otu[,c(1:8)]
+otu <- as.data.frame(t(otu))
+
+meta$total_abundance <- rowSums(pae_metadata_otu[,-c(1:8)])
+
+otu_and_metadata <- as.data.frame(cbind(meta,otu))
+
+
+PAE_grouped <- gather(otu_and_metadata, key = "ASV",value = "abundance",-(1:9))
+
+PAE_grouped <- subset(PAE_grouped, (PAE_grouped$prenatal_group == "Control" & PAE_grouped$drug_group == "No drug")|(PAE_grouped$prenatal_group == "Ethanol" & PAE_grouped$drug_group != "No drug"))
+PAE_grouped[,6] <- paste(PAE_grouped[,6],PAE_grouped[,7])
+PAE_grouped <- PAE_grouped[,-7]
+
+plotrelative_abundance_allOTU <- ggplot(PAE_grouped,aes(x=MI_ID,y=(abundance)*100,fill=ASV))+
+  geom_bar(stat = "identity",position = "fill",color="white") +
+  facet_grid(as.formula(paste("~","prenatal_group")),scales = "free_x", space = "free")+
+  theme(legend.position = "none",
+    axis.text.x = element_text(angle=-90, size= 7),
+    axis.ticks.x = element_blank())+
+  labs(x="Sample ID", y= " Relative Abundance")
+
+pdf(paste("Relative abundance plot by ASV, Control-no-drug vs Ethanol-2drugs.pdf"))
+    
+plotrelative_abundance_allOTU
+ 
+dev.off()
+
+```
+
+```{r, Group data by ASV, include=TRUE, echo=FALSE}
+
+pae_otu_tax_byASV <- as.data.frame(cbind(pae_tax,pae_otu))
+otu <- pae_otu_tax_byASV[,c(9:73)]
+meta <- pae_metadata_otu[,c(1:8)]
+otu <- as.data.frame(t(otu))
+
+meta$total_abundance <- rowSums(pae_metadata_otu[,-c(1:8)])
+
+otu_and_metadata <- as.data.frame(cbind(meta,otu))
+
+
+PAE_grouped <- gather(otu_and_metadata, key = "ASV",value = "abundance",-(1:9))
+
+PAE_grouped <- subset(PAE_grouped, (PAE_grouped$sex == "Male" & PAE_grouped$prenatal_group == "Control" & PAE_grouped$drug_group == "No drug")|(PAE_grouped$sex == "Male" & PAE_grouped$prenatal_group == "Ethanol" & PAE_grouped$drug_group != "No drug"))
+PAE_grouped[,5] <- paste(PAE_grouped[,5],PAE_grouped[,6],PAE_grouped[,7])
+PAE_grouped <- PAE_grouped[,-c(6,7)]
+
+plotrelative_abundance_allOTU <- ggplot(PAE_grouped,aes(x=MI_ID,y=(abundance)*100,fill=ASV))+
+  geom_bar(stat = "identity",position = "fill",color="white") +
+  facet_grid(as.formula(paste("~","sex")),scales = "free_x", space = "free")+
+  theme(legend.position = "none",
+    axis.text.x = element_text(angle=-90, size= 7),
+    axis.ticks.x = element_blank())+
+  labs(x="Sample ID", y= " Relative Abundance")
+
+pdf(paste("Relative abundance plot by ASV, Male-only Control-no-drug vs Ethanol-2drugs.pdf"))
+    
+plotrelative_abundance_allOTU
+ 
+dev.off()
+
+```
+
+```{r, Group data by ASV, include=TRUE, echo=FALSE}
+
+pae_otu_tax_byASV <- as.data.frame(cbind(pae_tax,pae_otu))
+otu <- pae_otu_tax_byASV[,c(9:73)]
+meta <- pae_metadata_otu[,c(1:8)]
+otu <- as.data.frame(t(otu))
+
+meta$total_abundance <- rowSums(pae_metadata_otu[,-c(1:8)])
+
+otu_and_metadata <- as.data.frame(cbind(meta,otu))
+
+
+PAE_grouped <- gather(otu_and_metadata, key = "ASV",value = "abundance",-(1:9))
+
+PAE_grouped <- subset(PAE_grouped, (PAE_grouped$sex == "Female" & PAE_grouped$prenatal_group == "Control" & PAE_grouped$drug_group == "No drug")|(PAE_grouped$sex == "Female" & PAE_grouped$prenatal_group == "Ethanol" & PAE_grouped$drug_group != "No drug"))
+PAE_grouped[,5] <- paste(PAE_grouped[,5],PAE_grouped[,6],PAE_grouped[,7])
+PAE_grouped <- PAE_grouped[,-c(6,7)]
+
+plotrelative_abundance_allOTU <- ggplot(PAE_grouped,aes(x=MI_ID,y=(abundance)*100,fill=ASV))+
+  geom_bar(stat = "identity",position = "fill",color="white") +
+  facet_grid(as.formula(paste("~","sex")),scales = "free_x", space = "free")+
+  theme(legend.position = "none",
+    axis.text.x = element_text(angle=-90, size= 7),
+    axis.ticks.x = element_blank())+
+  labs(x="Sample ID", y= " Relative Abundance")
+
+pdf(paste("Relative abundance plot by ASV, Female-only Control-no-drug vs Ethanol-2drugs.pdf"))
+    
+plotrelative_abundance_allOTU
+ 
+dev.off()
+
+```
+
+```{r}
+
+##### Femaly only parwise #######
+
+a <- subset(pae_metadata_otu, (pae_metadata_otu$sex == "Female" & pae_metadata_otu$prenatal_group == "Control" & pae_metadata_otu$drug_group == "No drug")|(pae_metadata_otu$sex == "Female" & pae_metadata_otu$prenatal_group == "Ethanol" & pae_metadata_otu$drug_group != "No drug"))
+
+a[,6] <- paste(a[,6],a[,7])
+a <- a[,-7]
+a <- group_by(a, prenatal_group)
+
+PAE_permanova <- adonis(as.formula(paste("a[,-c(1:7)] ~","prenatal_group")),data=a[,c(1:7)])
+
+pairwise_table <- table(pairwise.adonis(a[,-c(1:7)],a[,c(1:7)][["prenatal_group"]]))
+write.csv(pairwise_table,file=paste(getwd(),"/","Female only Control-no-drug vs Ethanol-2drugs","_parwise.csv",sep=""))
+
+
+```
+
+```{r}
+# otu + tax
+a <- data.frame(cbind(pae_tax,pae_otu),stringsAsFactors = FALSE)
+
+
+# Grouping them by Family level
+a = group_by(a, Rank1, Rank2, Rank3, Rank4, Rank5)
+a = summarise_if(a, is.numeric, sum, na.rm=TRUE)
+a = filter(a,!is.na(Rank5))
+###
+
+# Alpha diversity
+alphameasures = run_all_diversity(a, 
+                                  species_col = -c(1:8), 
+                                  filter_by = "Rank5"
+                                  )
+
+# Calculate total abundance of each family in each sample
+# Relative abundance box plot 
+
+
+```
+
+```{r}
+a <- pae_metadata_otu
+alphameasures = run_all_diversity(a, 
+                                  species_col = -c(1:8), 
+                                  filter_by = "MI_ID"
+                                  )
+a <- inner_join(alphameasures, pae_metadata, by = "MI_ID")
+a <- gather(a, "richness", "Value", 3)
+a$prenatal_group <- paste(a$prenatal_group,a$drug_group) 
+
+ggplot(a, aes(x=sex, y=Value)) +
+  geom_boxplot() +
+  geom_point(alpha=0.6,position = position_jitter(width = 0.1)) +
+  facet_grid(~prenatal_group) +
+  labs(x="Sex", y="Richness")
+
+
+
+
+```
+
+```{r}
+
+a <- pae_metadata_otu
+alphameasures = run_all_diversity(a, 
+                                  species_col = -c(1:8), 
+                                  filter_by = "MI_ID"
+                                  )
+a <- inner_join(alphameasures, pae_metadata, by = "MI_ID")
+a <- gather(a, "shannons", "Value", 4)
+a$prenatal_group <- paste(a$prenatal_group,a$drug_group) 
+
+ggplot(a, aes(x=sex, y=Value)) +
+  geom_boxplot() +
+  geom_point(alpha=0.6,position = position_jitter(width = 0.1)) +
+  facet_grid(~prenatal_group)
+```
+
+```{r}
+a <- pae_metadata_otu
+alphameasures = run_all_diversity(a, 
+                                  species_col = -c(1:8), 
+                                  filter_by = "MI_ID"
+                                  )
+a <- inner_join(alphameasures, pae_metadata, by = "MI_ID")
+a <- gather(a, "inv_simpsons", "Value", 5)
+a$prenatal_group <- paste(a$prenatal_group,a$drug_group) 
+
+ggplot(a, aes(x=sex, y=Value)) +
+  geom_boxplot() +
+  geom_point(alpha=0.6,position = position_jitter(width = 0.1)) +
+  facet_grid(~prenatal_group)
+```
+
+```{r}
+a <- pae_metadata_otu
+alphameasures = run_all_diversity(a, 
+                                  species_col = -c(1:8), 
+                                  filter_by = "MI_ID"
+                                  )
+a <- inner_join(alphameasures, pae_metadata, by = "MI_ID")
+a <- gather(a, "inv_simpsons", "Value", 5)
+a$prenatal_group <- paste(a$prenatal_group,a$drug_group) 
+
+ggplot(a, aes(x=sex, y=Value)) +
+  geom_boxplot() +
+  geom_point(alpha=0.6,position = position_jitter(width = 0.1)) +
+  facet_grid(~prenatal_group)
+```
+
+
+

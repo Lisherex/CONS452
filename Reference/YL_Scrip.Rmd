@@ -1,0 +1,411 @@
+
+
+```{r}
+defaultdir <- getwd()
+dir.create("graphs")
+# "/graphs/"
+# setwd(paste(defaultdir,"/graphs/", sep = ""))
+dir.create("tables")
+# "/tables/"
+```
+
+```{r, loading packages, include=TRUE, echo=FALSE}
+#Adding the required packages for this file. Don't change the current order, and add new packages to the first.
+packages <- c(
+  "ggplot2", 
+  "tidyverse", 
+  "dplyr",
+  "corrplot",
+  "Hmisc",
+  "plot.matrix"
+  ) 
+if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
+  install.packages(setdiff(packages, rownames(installed.packages())))
+  lapply(packages, library, character.only = TRUE)
+} else {
+  lapply(packages, library, character.only = TRUE)
+}
+#Adding the required packages for this file. Don't change the current order, and add new packages to the first.
+
+```
+
+```{r, loading data, include=TRUE, echo=FALSE}
+setwd(defaultdir)
+HH_Malawi <- read.csv(paste(defaultdir,"/","HH_Malawi.csv",sep=""),
+                     header = T,sep = ",")
+# Correcting colnames
+colnames(HH_Malawi)[1] <- "HouseholdId"
+colnames(HH_Malawi)[39] <- "PercentageForest"
+# Correcting colnames
+
+```
+
+```{r, Question1, include=TRUE, echo=FALSE}
+# How many households are there in total??
+
+nrow(HH_Malawi) %>%
+  paste("There are",.,"Households in total.") %>%
+  print()
+
+```
+
+```{r, Creating DDS, include=TRUE, echo=FALSE}
+# Healthy Foods DDS
+HealthyDDS <- mutate(HH_Malawi, 
+                     HealthyDDS = 
+                       HH_Malawi$CerealsTubers + 
+                       HH_Malawi$Pulses + 
+                       HH_Malawi$NutsSeeds + 
+                       HH_Malawi$Dairy + 
+                       HH_Malawi$MeatPoultryFish + 
+                       HH_Malawi$Eggs + 
+                       HH_Malawi$DarkGreenLeafyVeg + 
+                       HH_Malawi$VitaminA + 
+                       HH_Malawi$OtherVeg + 
+                       HH_Malawi$OtherFruit
+                     )
+# Healthy and Unhealthy DDS (combined DDS) 
+CombinedDDS <- mutate(HH_Malawi, 
+                      CombinedDDS = 
+                        HH_Malawi$Cereal + 
+                        HH_Malawi$Tubers + 
+                        HH_Malawi$Legumes + 
+                        HH_Malawi$Veggies + 
+                        HH_Malawi$Meat_PoultryFAO5 + 
+                        HH_Malawi$FruitsFAO6 + 
+                        HH_Malawi$Milk + 
+                        HH_Malawi$Sweets + 
+                        HH_Malawi$OilFat + 
+                        HH_Malawi$SpiceCondiments + 
+                        HH_Malawi$EggsFao11 + 
+                        HH_Malawi$FishFAO12
+                      )
+
+```
+
+```{r, Question 2, include=TRUE, echo=FALSE}
+setwd(paste(defaultdir,"/graphs/", sep = ""))
+
+percent_HH_DDS <- HealthyDDS %>%
+  count(wealth.index, HealthyDDS) %>%
+  group_by(wealth.index) %>%
+  mutate(percent = n / sum(n)) %>%
+  ungroup()
+
+png(paste(defaultdir,"/graphs/The Proportion of Households' Health Dietary Diversity Scores (DDS) of Each Wealth Category.png", sep = "")) 
+ggplot(percent_HH_DDS, aes(x = wealth.index , y = percent, fill = as.factor(HealthyDDS))) +
+  geom_bar(stat = "identity", position = "fill") + 
+  labs(title= "The Proportion of Households' \nHealthy Dietary Diversity Scores (DDS) by \nEach Wealth Category", x = "Wealth Group", y="% of Households", fill="DDS") + 
+  theme_minimal(base_size= 14) +
+  theme(legend.position = "right", legend.direction = "vertical", plot.title = element_text(hjust=0.5)) + 
+  scale_x_discrete(limits = c("Poor", "Middle", "Rich"))
+dev.off()
+
+```
+
+```{r, Question 3, include=TRUE, echo=FALSE}
+setwd(paste(defaultdir,"/graphs/", sep = ""))
+
+png(paste(defaultdir,"/graphs/plot1.png", sep = ""))
+ggplot(HealthyDDS, aes(x = wealth.index, y = HealthyDDS)) + 
+  geom_boxplot() + 
+  scale_x_discrete(limits = c("Poor", "Middle", "Rich")) +
+  xlab("Wealth Group") + ylab("Healthy DDS") + 
+  ggtitle("The Healthy DDS socres by Wealth Group") +
+  theme(plot.title = element_text(hjust = 0.5))
+dev.off()
+
+png(paste(defaultdir,"/graphs/plot2.png", sep = ""))
+ggplot(CombinedDDS, aes(x = wealth.index, y = CombinedDDS)) + 
+  geom_boxplot() + 
+  scale_x_discrete(limits = c("Poor", "Middle", "Rich")) +
+  xlab("Wealth Group") + ylab("Combined DDS") + 
+  ggtitle("The Combined DDS socres by Wealth Group") +
+  theme(plot.title = element_text(hjust = 0.5))
+dev.off()
+
+for (i in 1:4)
+{
+  a <- c("Poor", "Middle", "Rich") 
+  if (i < 4){
+    
+    filter(HealthyDDS, wealth.index == a[i]) %>% 
+      summarise(mean(HealthyDDS)) %>% 
+      paste("The mean Healthy DDS for the", a[i], "is",.) %>% 
+      print() 
+    filter(HealthyDDS, wealth.index == a[i]) %>% 
+      summarise(mean(HealthyDDS)) %>% 
+      paste("The mean Combined DDS for the", a[i], "is",.) %>% 
+      print()
+  } else {
+    remove(i, a)
+  }
+} 
+
+lm(HealthyDDS ~ wealth.index, data=HealthyDDS) %>%
+  anova()
+  
+lm(CombinedDDS ~ wealth.index, data=CombinedDDS) %>%
+  anova()
+
+# t-test of Healthy DDS across wealth groups
+for (i in 1:4)
+{
+  a <- c("Poor", "Middle", "Rich") 
+  if (i == 3){
+    print(paste("The t-test of Healthy DDS between",a[i-2], "and", a[i]))
+    HealthyDDS %>% 
+      subset(.,wealth.index == a[i-2] | wealth.index == a[i]) %>% 
+      t.test(HealthyDDS ~ wealth.index, data =., var.equal = TRUE) %>%
+      print()
+    } else if (i <= 2) {
+      print(paste("The t-test of Healthy DDS between",a[i], "and", a[i+1]))
+      HealthyDDS %>% 
+        subset(.,wealth.index == a[i] | wealth.index == a[i+1]) %>% 
+        t.test(HealthyDDS ~ wealth.index, data =., var.equal = TRUE) %>% 
+        print()
+    } else if (i == 4) {
+        remove(i, a)
+      } 
+} 
+# t-test of Combined DDS across wealth groups
+for (i in 1:4)
+{
+  a <- c("Poor", "Middle", "Rich") 
+  if (i == 3){
+    print(paste("The t-test of Combined DDS between",a[i-2], "and", a[i]))
+    CombinedDDS %>% 
+      subset(.,wealth.index == a[i-2] | wealth.index == a[i]) %>% 
+      t.test(CombinedDDS ~ wealth.index, data =., var.equal = TRUE) %>%
+      print()
+    } else if (i <= 2) {
+      print(paste("The t-test of Combined DDS between",a[i], "and", a[i+1]))
+      CombinedDDS %>% 
+        subset(.,wealth.index == a[i] | wealth.index == a[i+1]) %>% 
+        t.test(CombinedDDS ~ wealth.index, data =., var.equal = TRUE) %>% 
+        print()
+    } else if (i == 4) {
+        remove(i, a)
+      } 
+} 
+
+
+```
+
+
+
+```{r, Divide by Cluster, include=TRUE, echo=FALSE}
+ClustersHealthy <- group_by(HealthyDDS, ClusterID) %>% 
+  summarise(PercentageForest=mean(PercentageForest), 
+            Number.of.patches=mean(Number.of.patches), 
+            dist_road=mean(dist_road), 
+            HealthyDDS=mean(HealthyDDS))
+
+ClustersCombined <- group_by(CombinedDDS, ClusterID) %>% 
+  summarise(PercentageForest=mean(PercentageForest), 
+            Number.of.patches=mean(Number.of.patches), 
+            dist_road=mean(dist_road), 
+            CombinedDDS=mean(CombinedDDS))
+
+```
+
+```{r,Healthy DDS and PercentageForest, include=TRUE, echo=FALSE}
+print("The summary of the linear regression model between Healthy DDS and the Percentage of Forest")
+lm(HealthyDDS  ~ PercentageForest, data=ClustersHealthy) %>%
+  summary()
+png(paste(defaultdir,"/graphs/plot3.png", sep = ""))
+ggplot(ClustersHealthy, aes(x=ClustersHealthy$PercentageForest, y=ClustersHealthy$HealthyDDS)) + 
+  geom_point() + 
+  theme_minimal() + 
+  theme_classic()+ 
+  geom_smooth(method = lm) +
+  xlab("Forest Coverage") + ylab("Healthy DDS") + 
+  ggtitle("The Relationship Between the Forest Coverage \nand the Healthy DDS") +
+  theme(plot.title = element_text(hjust = 0.5))
+dev.off()
+
+```
+
+```{r,Healthy DDS and Number.of.patches, include=TRUE, echo=FALSE}
+
+print("The summary of the linear regression model between Healthy DDS and the Number of patches")
+lm(HealthyDDS  ~ Number.of.patches, data=ClustersHealthy) %>%
+  summary()
+png(paste(defaultdir,"/graphs/plot4.png", sep = ""))
+ggplot(ClustersHealthy, aes(x=ClustersHealthy$Number.of.patches, y=ClustersHealthy$HealthyDDS)) + 
+  geom_point() + 
+  theme_minimal() + 
+  theme_classic()+ 
+  geom_smooth(method = lm) +
+  xlab("Number of Patches") + ylab("Healthy DDS") + 
+  ggtitle("The Relationship Between the Number of patches \nand the Healthy DDS") +
+  theme(plot.title = element_text(hjust = 0.5))
+dev.off()
+
+```
+
+```{r,Healthy DDS and dist_road, include=TRUE, echo=FALSE}
+
+print("The summary of the linear regression model between Healthy DDS and the Distance to Road")
+lm(HealthyDDS  ~ dist_road, data=ClustersHealthy) %>%
+  summary()
+png(paste(defaultdir,"/graphs/plot5.png", sep = ""))
+ggplot(ClustersHealthy, aes(x=ClustersHealthy$dist_road, y=ClustersHealthy$HealthyDDS)) + 
+  geom_point() + 
+  theme_minimal() + 
+  theme_classic()+ 
+  geom_smooth(method = lm) +
+  xlab("Distance to Road") + ylab("Healthy DDS") + 
+  ggtitle("The Relationship Between the Distance to Road \nand the Healthy DDS") +
+  theme(plot.title = element_text(hjust = 0.5))
+dev.off()
+
+```
+
+```{r,Combined DDS and PercentageForest, include=TRUE, echo=FALSE}
+print("The summary of the linear regression model between Combined DDS and the Percentage of Forest")
+lm(CombinedDDS  ~ PercentageForest, data=ClustersCombined) %>%
+  summary()
+png(paste(defaultdir,"/graphs/plot6.png", sep = ""))
+ggplot(ClustersHealthy, aes(x=ClustersCombined$PercentageForest, y=ClustersCombined$CombinedDDS)) + 
+  geom_point() + 
+  theme_minimal() + 
+  theme_classic()+ 
+  geom_smooth(method = lm) +
+  xlab("Forest Coverage") + ylab("Combined DDS") + 
+  ggtitle("The Relationship Between the Forest Coverage \nand the Combined DDS") +
+  theme(plot.title = element_text(hjust = 0.5))
+dev.off()
+
+```
+
+```{r,Combined DDS and Number.of.patches, include=TRUE, echo=FALSE}
+
+print("The summary of the linear regression model between Combined DDS and the Number of patches")
+lm(CombinedDDS  ~ Number.of.patches, data=ClustersCombined) %>%
+  summary()
+png(paste(defaultdir,"/graphs/plot7.png", sep = ""))
+ggplot(ClustersCombined, aes(x=ClustersCombined$Number.of.patches, y=ClustersCombined$CombinedDDS)) + 
+  geom_point() + 
+  theme_minimal() + 
+  theme_classic()+ 
+  geom_smooth(method = lm) +
+  xlab("Number of Patches") + ylab("Combined DDS") + 
+  ggtitle("The Relationship Between the Number of patches \nand the Combined DDS") +
+  theme(plot.title = element_text(hjust = 0.5))
+dev.off()  
+
+```
+
+```{r,Combined DDS and dist_road, include=TRUE, echo=FALSE}
+
+print("The summary of the linear regression model between Combined DDS and the Distance to Road")
+lm(CombinedDDS  ~ dist_road, data=ClustersCombined) %>%
+  summary()
+png(paste(defaultdir,"/graphs/plot8.png", sep = ""))
+ggplot(ClustersHealthy, aes(x=ClustersCombined$dist_road, y=ClustersCombined$CombinedDDS)) + 
+  geom_point() + 
+  theme_minimal() + 
+  theme_classic()+ 
+  geom_smooth(method = lm) +
+  xlab("Distance to Road") + ylab("Combined DDS") + 
+  ggtitle("The Relationship Between the Distance to Road \nand the Combined DDS") +
+  theme(plot.title = element_text(hjust = 0.5))
+dev.off()  
+
+```
+
+```{r, anova for healthy DDS and ForestCoverage, include=TRUE, echo=FALSE}
+png(paste(defaultdir,"/graphs/boxplot1.png", sep = ""))
+HealthyDDS %>% 
+  mutate(ForestGroup=cut(PercentageForest, 
+                         breaks=c(-Inf, 30.0, 60.0, Inf), 
+                         labels=c("< 30% Forest Cover","30-60% Forest Cover",">60% Forest Cover"))) %>% 
+  boxplot(HealthyDDS ~ ForestGroup, data =., main = "The Boxplot of the Forest Coverage and the Healthy DDS", xlab = "Forest Group", ylab = "Healthy DDS")
+dev.off()
+HealthyDDS %>% 
+  mutate(ForestGroup=cut(PercentageForest, 
+                         breaks=c(-Inf, 30.0, 60.0, Inf), 
+                         labels=c("< 30% Forest Cover","30-60% Forest Cover",">60% Forest Cover"))) %>% 
+  lm(HealthyDDS ~ ForestGroup, data=., main = "The Boxplot of the Forest Coverage and the Healthy DDS", xlab = "Forest Group", ylab = "Healthy DDS") %>% 
+  anova(.)
+
+```
+
+```{r, t-test for Healthy DDS, include=TRUE, echo=FALSE}
+print("The t-test of Healthy: <30 and 30-60")
+HealthyDDS %>% 
+  mutate(ForestGroup=cut(PercentageForest, 
+                         breaks=c(-Inf, 30.0, 60.0, Inf), 
+                         labels=c("< 30% Forest Cover","30-60% Forest Cover",">60% Forest Cover"))) %>% 
+  subset(.,ForestGroup == "< 30% Forest Cover" | ForestGroup == "30-60% Forest Cover") %>% 
+  t.test(HealthyDDS ~ ForestGroup, data =., var.equal = TRUE)
+
+print("The t-test of Healthy: <30 and >60")
+HealthyDDS %>% 
+  mutate(ForestGroup=cut(PercentageForest, 
+                         breaks=c(-Inf, 30.0, 60.0, Inf), 
+                         labels=c("< 30% Forest Cover","30-60% Forest Cover",">60% Forest Cover"))) %>% 
+  subset(.,ForestGroup == "< 30% Forest Cover" | ForestGroup == ">60% Forest Cover") %>% 
+  t.test(HealthyDDS ~ ForestGroup, data =., var.equal = TRUE)
+
+print("The t-test of Healthy: 30-60 and >60")
+HealthyDDS %>% 
+  mutate(ForestGroup=cut(PercentageForest, 
+                         breaks=c(-Inf, 30.0, 60.0, Inf), 
+                         labels=c("< 30% Forest Cover","30-60% Forest Cover",">60% Forest Cover"))) %>% 
+  subset(.,ForestGroup == "30-60% Forest Cover" | ForestGroup == ">60% Forest Cover") %>% 
+  t.test(HealthyDDS ~ ForestGroup, data =., var.equal = TRUE)
+
+```
+
+```{r, anova for Combined DDS and ForestCoverage, include=TRUE, echo=FALSE}
+png(paste(defaultdir,"/graphs/boxplot2.png", sep = ""))
+CombinedDDS %>% 
+  mutate(ForestGroup=cut(PercentageForest, 
+                         breaks=c(-Inf, 30.0, 60.0, Inf), 
+                         labels=c("< 30% Forest Cover","30-60% Forest Cover",">60% Forest Cover"))) %>% 
+  boxplot(CombinedDDS ~ ForestGroup, data =., main = "The Boxplot of the Forest Coverage and the Combined DDS", xlab = "Forest Group", ylab = "Combined DDS")
+dev.off()
+CombinedDDS %>% 
+  mutate(ForestGroup=cut(PercentageForest, 
+                         breaks=c(-Inf, 30.0, 60.0, Inf), 
+                         labels=c("< 30% Forest Cover","30-60% Forest Cover",">60% Forest Cover"))) %>% 
+  lm(CombinedDDS ~ ForestGroup, data=., main = "The Boxplot of the Forest Coverage and the Combined DDS", xlab = "Forest Group", ylab = "Combined DDS") %>% 
+  anova(.)
+
+
+```
+
+```{r, t-test for Combined DDS, include=TRUE, echo=FALSE}
+print("The t-test of Combined: <30 and 30-60")
+CombinedDDS %>% 
+  mutate(ForestGroup=cut(PercentageForest, 
+                         breaks=c(-Inf, 30.0, 60.0, Inf), 
+                         labels=c("< 30% Forest Cover","30-60% Forest Cover",">60% Forest Cover"))) %>% 
+  subset(.,ForestGroup == "< 30% Forest Cover" | ForestGroup == "30-60% Forest Cover") %>% 
+  t.test(CombinedDDS ~ ForestGroup, data =., var.equal = TRUE)
+
+print("The t-test of Combined: <30 and >60")
+CombinedDDS %>% 
+  mutate(ForestGroup=cut(PercentageForest, 
+                         breaks=c(-Inf, 30.0, 60.0, Inf), 
+                         labels=c("< 30% Forest Cover","30-60% Forest Cover",">60% Forest Cover"))) %>% 
+  subset(.,ForestGroup == "< 30% Forest Cover" | ForestGroup == ">60% Forest Cover") %>% 
+  t.test(CombinedDDS ~ ForestGroup, data =., var.equal = TRUE)
+
+print("The t-test of Combined: 30-60 and >60")
+CombinedDDS %>% 
+  mutate(ForestGroup=cut(PercentageForest, 
+                         breaks=c(-Inf, 30.0, 60.0, Inf), 
+                         labels=c("< 30% Forest Cover","30-60% Forest Cover",">60% Forest Cover"))) %>% 
+  subset(.,ForestGroup == "30-60% Forest Cover" | ForestGroup == ">60% Forest Cover") %>% 
+  t.test(CombinedDDS ~ ForestGroup, data =., var.equal = TRUE)
+
+```
+
+
+
+
+
+
