@@ -19,7 +19,8 @@ packages <- c(
   "corrplot",
   "Hmisc", 
   "gridExtra", 
-  "ggrepel"
+  "ggrepel",
+  "grid"
   ) 
 if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
   install.packages(setdiff(packages, rownames(installed.packages())))
@@ -46,7 +47,8 @@ for(i in 2006:2019){
   a <- a[, c(2, 6 , 20, 23)]
   a <- a %>%
   group_by(Marsh_Class) %>%
-  summarise_at(vars(), funs(mean(., na.rm=TRUE))) 
+  summarise_at(vars(-veg_year), funs(mean(., na.rm=TRUE)))
+  a <- add_column(a, veg_year = c(i,i,i,i), .after = 1)
   write.csv(a, paste(defaultdir,"/tables/Average_VVI_Salinity/",i ,"_Average_VVI_Salinity.csv",sep=""), row.names = FALSE)
 }
 
@@ -59,7 +61,8 @@ write.csv(a, paste(defaultdir,"/tables/Average_VVI_Salinity/" ,"Total_Average_VV
 
 remove(a)
 ```
-
+d %>% group_by(Name) %>% summarise_at(.vars = names(.)[3:4],.funs = c(mean="mean"))
+summarise_at(vars(), funs(mean(., na.rm=TRUE))) 
 ```{r}
 setwd(defaultdir)
 AveVVI_vs_AveSal <- read.csv(paste(defaultdir,"/tables/Average_VVI_Salinity/", "Total_Average_VVI_Salinit.csv",sep=""),
@@ -190,16 +193,16 @@ Brackish_plot <- ggplot(Brackish,aes(x=veg_year,y=Average_Salinity)) +
         ) + 
   geom_smooth(method = "lm", se = FALSE) + 
   theme(legend.position = "none", panel.background = element_rect(fill = 'white', colour = 'black')) + 
-  annotation_custom(grobTree(textGrob("Brackish", x=0.87,  y=0.97, hjust=0,
-  gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
-  annotation_custom(grobTree(textGrob("p-value = 0.003", x=0.77,  y=0.90, hjust=0,
-  gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
-  annotation_custom(grobTree(textGrob(" Pearson correlation coefficient, r = -0.73", x=0.41,  y=0.83, hjust=0,
-  gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
+  # annotation_custom(grobTree(textGrob("Brackish", x=0.87,  y=0.97, hjust=0,
+  # gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
+  # annotation_custom(grobTree(textGrob("p-value = 0.003", x=0.77,  y=0.90, hjust=0,
+  # gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
+  # annotation_custom(grobTree(textGrob(" Pearson correlation coefficient, r = -0.73", x=0.41,  y=0.83, hjust=0,
+  # gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
   scale_x_continuous(labels = as.character(AveVVI_vs_AveSal$veg_year), breaks = AveVVI_vs_AveSal$veg_year)
 Brackish_plot
 
-cor.test(Brackish$Average_Salinity, Brackish$veg_year)
+summary(lm(Brackish$Average_Salinity ~ Brackish$veg_year))
 
 ###########
 
@@ -216,16 +219,16 @@ Fresh_plot <- ggplot(Fresh,aes(x=veg_year,y=Average_Salinity)) +
         ) + 
   geom_smooth(method = "lm", se = FALSE) + 
   theme(legend.position = "none", panel.background = element_rect(fill = 'white', colour = 'black')) + 
-  annotation_custom(grobTree(textGrob("Fresh", x=0.91,  y=0.97, hjust=0,
-  gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
-  annotation_custom(grobTree(textGrob("p-value = 0.02", x=0.789,  y=0.90, hjust=0,
-  gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
-  annotation_custom(grobTree(textGrob(" Pearson correlation coefficient, r = -0.61", x=0.41,  y=0.83, hjust=0,
-  gp=gpar(col="black", fontsize=15, fontface="italic")))) +   
+  # annotation_custom(grobTree(textGrob("Fresh", x=0.91,  y=0.97, hjust=0,
+  # gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
+  # annotation_custom(grobTree(textGrob("p-value = 0.02", x=0.789,  y=0.90, hjust=0,
+  # gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
+  # annotation_custom(grobTree(textGrob(" Pearson correlation coefficient, r = -0.61", x=0.41,  y=0.83, hjust=0,
+  # gp=gpar(col="black", fontsize=15, fontface="italic")))) +   
   scale_x_continuous(labels = as.character(AveVVI_vs_AveSal$veg_year), breaks = AveVVI_vs_AveSal$veg_year)
 Fresh_plot
 
-cor.test(Fresh$Average_Salinity, Fresh$veg_year)
+summary(lm(Fresh$Average_Salinity ~ Fresh$veg_year))
 
 ###########
 Intermediate <- subset(AveVVI_vs_AveSal, Marsh_Class == "Intermediate")
@@ -241,16 +244,16 @@ Intermediate_plot <- ggplot(Intermediate,aes(x=veg_year,y=Average_Salinity)) +
         ) + 
   geom_smooth(method = "lm", se = FALSE) + 
   theme(legend.position = "none", panel.background = element_rect(fill = 'white', colour = 'black')) + 
-  annotation_custom(grobTree(textGrob("Intermediate", x=0.82,  y=0.97, hjust=0,
-  gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
-  annotation_custom(grobTree(textGrob("p-value = 0.0007", x=0.757,  y=0.90, hjust=0,
-  gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
-  annotation_custom(grobTree(textGrob(" Pearson correlation coefficient, r = -0.79", x=0.42,  y=0.83, hjust=0,
-  gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
+  # annotation_custom(grobTree(textGrob("Intermediate", x=0.82,  y=0.97, hjust=0,
+  # gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
+  # annotation_custom(grobTree(textGrob("p-value = 0.0007", x=0.757,  y=0.90, hjust=0,
+  # gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
+  # annotation_custom(grobTree(textGrob(" Pearson correlation coefficient, r = -0.79", x=0.42,  y=0.83, hjust=0,
+  # gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
   scale_x_continuous(labels = as.character(AveVVI_vs_AveSal$veg_year), breaks = AveVVI_vs_AveSal$veg_year)
 Intermediate_plot
 
-cor.test(Intermediate$Average_Salinity, Intermediate$veg_year)
+summary(lm(Intermediate$Average_Salinity ~ Intermediate$veg_year))
 
 ###########
 Saline <- subset(AveVVI_vs_AveSal, Marsh_Class == "Saline")
@@ -266,16 +269,16 @@ Saline_plot <- ggplot(Saline,aes(x=veg_year,y=Average_Salinity)) +
         ) + 
   geom_smooth(method = "lm", se = FALSE) + 
   theme(legend.position = "none", panel.background = element_rect(fill = 'white', colour = 'black')) + 
-  annotation_custom(grobTree(textGrob("Saline", x=0.9,  y=0.97, hjust=0,
-  gp=gpar(col="black", fontsize=15, fontface="italic")))) +  
-  annotation_custom(grobTree(textGrob("p-value = 0.02", x=0.78,  y=0.90, hjust=0,
-  gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
-  annotation_custom(grobTree(textGrob(" Pearson correlation coefficient, r = -0.61", x=0.40,  y=0.83, hjust=0,
-  gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
+  # annotation_custom(grobTree(textGrob("Saline", x=0.9,  y=0.97, hjust=0,
+  # gp=gpar(col="black", fontsize=15, fontface="italic")))) +  
+  # annotation_custom(grobTree(textGrob("p-value = 0.02", x=0.78,  y=0.90, hjust=0,
+  # gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
+  # annotation_custom(grobTree(textGrob(" Pearson correlation coefficient, r = -0.61", x=0.40,  y=0.83, hjust=0,
+  # gp=gpar(col="black", fontsize=15, fontface="italic")))) + 
   scale_x_continuous(labels = as.character(AveVVI_vs_AveSal$veg_year), breaks = AveVVI_vs_AveSal$veg_year)
 Saline_plot
 
-cor.test(Saline$Average_Salinity, Saline$veg_year)
+summary(lm(Saline$Average_Salinity ~ Saline$veg_year))
 
 grid.arrange(Brackish_plot, Fresh_plot ,Intermediate_plot, Saline_plot, nrow = 2)
 ####################
@@ -290,9 +293,7 @@ AveVVI_vs_year_plot <- ggplot(AveVVI_vs_AveSal,aes(x=veg_year,y=Average_Salinity
   geom_smooth(method = "lm", se = FALSE)
 
 AveVVI_vs_year_plot
-
-cor.test(AveVVI_vs_AveSal$Average_Salinity, AveVVI_vs_AveSal$veg_year)
-
+summary(lm(AveVVI_vs_AveSal$Average_Salinity ~ AveVVI_vs_AveSal$veg_year))
 ```
 
 
@@ -315,7 +316,7 @@ Brackish_plot <- ggplot(Brackish,aes(x=veg_year,y=Average_VVI)) +
   scale_x_continuous(labels = as.character(AveVVI_vs_AveSal$veg_year), breaks = AveVVI_vs_AveSal$veg_year)
 Brackish_plot
 
-cor.test(Brackish$Average_VVI, Brackish$veg_year)
+summary(lm(Brackish$Average_VVI ~ Brackish$veg_year))
 
 ###########
 
@@ -334,7 +335,7 @@ Fresh_plot <- ggplot(Fresh,aes(x=veg_year,y=Average_VVI)) +
   scale_x_continuous(labels = as.character(AveVVI_vs_AveSal$veg_year), breaks = AveVVI_vs_AveSal$veg_year)
 Fresh_plot
 
-cor.test(Fresh$Average_VVI, Fresh$veg_year)
+summary(lm(Fresh$Average_VVI ~ Fresh$veg_year))
 
 ###########
 Intermediate <- subset(AveVVI_vs_AveSal, Marsh_Class == "Intermediate")
@@ -352,7 +353,7 @@ Intermediate_plot <- ggplot(Intermediate,aes(x=veg_year,y=Average_VVI)) +
   scale_x_continuous(labels = as.character(AveVVI_vs_AveSal$veg_year), breaks = AveVVI_vs_AveSal$veg_year)
 Intermediate_plot
 
-cor.test(Intermediate$Average_VVI, Intermediate$veg_year)
+summary(lm(Intermediate$Average_VVI ~ Intermediate$veg_year))
 
 ###########
 Saline <- subset(AveVVI_vs_AveSal, Marsh_Class == "Saline")
@@ -370,7 +371,7 @@ Saline_plot <- ggplot(Saline,aes(x=veg_year,y=Average_VVI)) +
   scale_x_continuous(labels = as.character(AveVVI_vs_AveSal$veg_year), breaks = AveVVI_vs_AveSal$veg_year)
 Saline_plot
 
-cor.test(Saline$Average_VVI, Saline$veg_year)
+summary(lm(Saline$Average_VVI ~ Saline$veg_year))
 
 grid.arrange(Brackish_plot, Fresh_plot ,Intermediate_plot, Saline_plot, nrow = 2)
 ####################
@@ -386,6 +387,6 @@ AveVVI_vs_year_plot <- ggplot(AveVVI_vs_AveSal,aes(x=veg_year,y=Average_VVI)) +
 
 AveVVI_vs_year_plot
 
-cor.test(AveVVI_vs_AveSal$Average_VVI, AveVVI_vs_AveSal$veg_year)
+summary(lm(AveVVI_vs_AveSal$Average_VVI ~ AveVVI_vs_AveSal$veg_year))
 
 ```
